@@ -6,11 +6,15 @@ module DAY2-SYNTAX
 
     syntax Input ::= Int "," Input | Int
     syntax Ints ::= List{Int, ""}
-    syntax Command ::= "#op" KItem "#args" KItem KItem KItem
+    syntax Command ::= "#load" | Op ":" Params
+    syntax Op ::= TernOp | "Halt"
+    syntax TernOp ::= "Mul" | "Add"
+    syntax Params ::= KItem "x" KItem ">" KItem
 
-    syntax  Int ::= count(Input) [function]
-    rule count(Int) => 1
-    rule count(I, IS) => 1 +Int count(IS)
+    syntax Op ::= toOp(KItem) [function]
+    rule toOp(1) => Add
+    rule toOp(2) => Mul
+    rule toOp(99) => Halt
 
 endmodule
 
@@ -20,21 +24,32 @@ module DAY2
 
   configuration
     <k> $PGM:Input </k>
+    <mem> .Map </mem>
     <pc> 0 </pc>
     <log> .K </log>
     
-    // Setup
+    // Setup: Load the list into memory.
     rule <k> I:Input => I ~> 0 ~> .Map  </k>
     rule <k> I:Int , IS:Input ~> X:Int ~> M:Map => IS ~> X +Int 1 ~> M[X <- I]  </k>
-    rule <k> I:Int ~> X:Int ~> M:Map => M[X <- I][1 <- 12][2 <- 2]  </k>
+    rule <k> I:Int ~> X:Int ~> M:Map => . </k>
+         <mem> _ => M[X <- I][1 <- 12][2 <- 2] </mem>
     
+    // Load next operation.
+    rule <k> . => toOp(M[PC]) </k>
+         <mem> M </mem>
+         <pc> PC => PC +Int 1 </pc>
     
-    rule <k> M:Map => #op M[PC] #args M[M[PC +Int 1]] M[M[PC +Int 2]] M[PC +Int 3] ~> M </k>
-         <pc> PC => PC +Int 4 </pc>
+    /// Load params.
+    rule <k> OP:TernOp => OP : M[M[PC]]  x  M[M[PC +Int 1]] > M[PC +Int 2] ... </k>
+         <mem> M </mem>
+         <pc> PC => PC +Int 3 </pc>
 
-    rule <k> #op 1 #args L1 L2 LT ~> M:Map => M[LT <- L1 +Int L2] </k>
-         <log> LOG => LOG ~> #op 1 #args L1 L2 LT </log>
-    rule <k> #op 2 #args L1 L2 LT ~> M:Map => M[LT <- L1 *Int L2] </k>
+    // Perform operation.
+    rule <k> Add : X x Y > LOC => . ... </k>
+         <mem> M => M[LOC <- X +Int Y] </mem>
+
+    rule <k> Mul : X x Y > LOC => . ... </k>
+         <mem> M => M[LOC <- X *Int Y] </mem>
 
 endmodule
 
